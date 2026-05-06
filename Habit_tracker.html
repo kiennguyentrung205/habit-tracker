@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Habit Tracker - Light Theme</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        
+        .check-cell { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .check-cell:hover { transform: scale(1.05); }
+        .check-cell:active { transform: scale(0.95); }
+        .progress-bar { transition: width 0.5s ease-out, background-color 0.3s ease, height 0.5s ease-out; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        
+        /* Today highlight for Light Theme */
+        .is-today {
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+            border-radius: 8px;
+            background: #ecfdf5; /* emerald-50 */
+        }
+
+        /* Modal transitions */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center">
+
+    <div class="max-w-6xl w-full glass-panel rounded-2xl shadow-xl p-6 md:p-8 relative">
+        <!-- Header & Navigation -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+            <div>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-emerald-500 flex items-center gap-3">
+                    <i class="fas fa-rocket text-blue-500"></i> Lộ Trình Kỷ Luật
+                </h1>
+                <p class="text-slate-500 mt-2 text-sm font-medium">"Success is the sum of small efforts, repeated day in and day out."</p>
+            </div>
+            
+            <div class="flex flex-col md:flex-row items-center gap-4">
+                <!-- Date Navigator -->
+                <div class="flex items-center gap-1 bg-white rounded-xl p-1 border border-slate-200 shadow-sm">
+                    <button onclick="changeWeek(-1)" class="p-2 px-3 hover:bg-slate-100 text-slate-600 rounded-lg transition" title="Tuần trước">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <!-- Tương tác mở Modal -->
+                    <button onclick="openOverview()" id="week-display" class="font-semibold px-2 min-w-[160px] text-center text-slate-700 hover:text-blue-600 transition cursor-pointer flex items-center justify-center gap-2" title="Mở bảng tổng quan">
+                        <span>Tháng 5, 2026</span>
+                        <i class="fas fa-caret-down text-sm opacity-50"></i>
+                    </button>
+                    <button onclick="changeWeek(1)" class="p-2 px-3 hover:bg-slate-100 text-slate-600 rounded-lg transition" title="Tuần sau">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <div class="w-[1px] h-6 bg-slate-200 mx-1"></div>
+                    <button onclick="goToToday()" class="p-2 px-4 text-sm hover:bg-slate-100 rounded-lg transition text-emerald-600 font-semibold">
+                        Hôm nay
+                    </button>
+                </div>
+
+                <!-- Weekly Score -->
+                <div class="bg-white rounded-xl p-2 px-4 border border-slate-200 flex items-center gap-3 shadow-sm">
+                    <div class="text-center">
+                        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Tiến độ tuần</div>
+                        <div id="weekly-score" class="text-2xl font-bold text-emerald-500 leading-none">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tracker Matrix -->
+        <div class="overflow-x-auto pb-4">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr>
+                        <th class="p-3 border-b border-slate-200 text-slate-600 font-semibold w-1/4 min-w-[200px]">Nhiệm vụ hàng ngày</th>
+                        <!-- Dynamic Date Headers -->
+                        <th id="header-day-0" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-1" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-2" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-3" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-4" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-5" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th id="header-day-6" class="p-2 border-b border-slate-200 text-center min-w-[80px]"></th>
+                        <th class="p-3 border-b border-slate-200 text-center text-slate-600 font-semibold w-32">Tiến trình</th>
+                    </tr>
+                </thead>
+                <tbody id="tracker-body">
+                    <!-- Rows generated by JS -->
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="p-3 font-semibold text-slate-500 text-right uppercase text-xs tracking-wider">Hoàn thành:</td>
+                        <td id="day-0-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-1-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-2-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-3-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-4-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-5-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td id="day-6-prog" class="p-3 text-center font-bold text-slate-400">0%</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td colspan="7" class="px-3 pb-3">
+                            <div class="w-full flex gap-1 h-2 rounded-full overflow-hidden bg-slate-100 border border-slate-200" id="daily-sparkline-container">
+                                <!-- Bars injected by JS -->
+                            </div>
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div class="mt-6 flex justify-between items-center text-slate-400 text-sm font-medium">
+            <div><i class="fas fa-info-circle mr-1"></i> Dữ liệu tự động lưu. Nhấp vào "Tháng/Năm" để xem tổng quan.</div>
+            <button onclick="clearData()" class="hover:text-red-500 transition"><i class="fas fa-trash-alt mr-1"></i> Xóa lịch sử</button>
+        </div>
+    </div>
+
+    <!-- MODAL TỔNG QUAN THEO NĂM/THÁNG -->
+    <div id="overview-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+        <!-- Close area background -->
+        <div class="absolute inset-0 cursor-pointer" onclick="closeOverview()"></div>
+        
+        <!-- Modal Content -->
+        <div id="modal-content" class="bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 w-full max-w-lg relative z-10 modal-enter-active">
+            
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="changeOverviewYear(-1)" class="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-600 rounded-full transition"><i class="fas fa-chevron-left"></i></button>
+                <div class="text-center">
+                    <h2 class="text-2xl font-black text-slate-800" id="overview-year">2026</h2>
+                    <p class="text-xs text-slate-500 font-medium">TỔNG QUAN TIẾN ĐỘ</p>
+                </div>
+                <button onclick="changeOverviewYear(1)" class="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-600 rounded-full transition"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            
+            <!-- Grid 12 Tháng -->
+            <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4" id="overview-months">
+                <!-- Generated by JS -->
+            </div>
+            
+            <button onclick="closeOverview()" class="mt-8 w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl transition">
+                Đóng
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const habits = [
+            { id: 'gym', name: 'Tập tạ', time: '7h - 7h45', icon: 'fas fa-dumbbell', color: 'bg-orange-500', iconColor: 'text-orange-500' },
+            { id: 'ielts', name: 'Học IELTS B1', time: '8h - 10h', icon: 'fas fa-graduation-cap', color: 'bg-blue-500', iconColor: 'text-blue-500' },
+            { id: 'code', name: 'Học lập trình', time: '13h - 17h', icon: 'fas fa-laptop-code', color: 'bg-indigo-500', iconColor: 'text-indigo-500' },
+            { id: 'run', name: 'Chạy bộ', time: '17h00', icon: 'fas fa-running', color: 'bg-emerald-500', iconColor: 'text-emerald-500' }
+        ];
+        const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        const monthNamesShort = ['Thg 1', 'Thg 2', 'Thg 3', 'Thg 4', 'Thg 5', 'Thg 6', 'Thg 7', 'Thg 8', 'Thg 9', 'Thg 10', 'Thg 11', 'Thg 12'];
+
+        // --- 2. STATE MANAGEMENT ---
+        let currentWeekStart = new Date(); 
+        let habitData = JSON.parse(localStorage.getItem('habitTrackerDataLight')) || {};
+        let overviewYear = new Date().getFullYear();
+
+        const tbody = document.getElementById('tracker-body');
+        const dailySparklineContainer = document.getElementById('daily-sparkline-container');
+
+        // --- 3. UTILITY FUNCTIONS ---
+        function getMonday(d) {
+            d = new Date(d);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function formatDate(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function isToday(d) {
+            const today = new Date();
+            return d.getDate() === today.getDate() &&
+                   d.getMonth() === today.getMonth() &&
+                   d.getFullYear() === today.getFullYear();
+        }
+
+        // --- 4. CORE LOGIC ---
+        function init() {
+            goToToday(); 
+        }
+
+        function changeWeek(offset) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (offset * 7));
+            renderWeek();
+        }
+
+        function goToToday() {
+            currentWeekStart = getMonday(new Date());
+            currentWeekStart.setHours(0,0,0,0);
+            renderWeek();
+        }
+
+        function renderWeek() {
+            updateHeaders();
+            renderRows();
+            renderSparklines();
+            updateAllProgress();
+        }
+
+        function updateHeaders() {
+            const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+            
+            for (let i = 0; i < 7; i++) {
+                let cellDate = new Date(currentWeekStart);
+                cellDate.setDate(cellDate.getDate() + i);
+                
+                const th = document.getElementById(`header-day-${i}`);
+                const isCellToday = isToday(cellDate);
+                
+                th.innerHTML = `
+                    <div class="flex flex-col items-center p-1.5 ${isCellToday ? 'is-today' : ''}">
+                        <span class="${isCellToday ? 'text-emerald-600 font-bold' : 'text-slate-400 font-semibold'} text-xs uppercase tracking-wider">${dayNames[i]}</span>
+                        <span class="${isCellToday ? 'text-emerald-600 font-black' : 'text-slate-700 font-bold'} text-lg">${cellDate.getDate()}</span>
+                    </div>
+                `;
+            }
+
+            let midWeek = new Date(currentWeekStart);
+            midWeek.setDate(midWeek.getDate() + 3);
+            document.getElementById('week-display').innerHTML = `<span>${monthNames[midWeek.getMonth()]}, ${midWeek.getFullYear()}</span> <i class="fas fa-caret-down text-sm opacity-50"></i>`;
+        }
+
+        function renderRows() {
+            tbody.innerHTML = '';
+            habits.forEach((habit, hIdx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
+                
+                // Habit Info
+                let html = `
+                    <td class="p-3 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-slate-200 shadow-sm">
+                                <i class="${habit.icon} ${habit.iconColor} text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-slate-700">${habit.name}</div>
+                                <div class="text-xs text-slate-500 font-mono font-medium"><i class="far fa-clock mr-1"></i>${habit.time}</div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+
+                // 7 Days Checkboxes
+                for (let i = 0; i < 7; i++) {
+                    let cellDate = new Date(currentWeekStart);
+                    cellDate.setDate(cellDate.getDate() + i);
+                    const dateStr = formatDate(cellDate);
+                    
+                    const isChecked = habitData[dateStr] && habitData[dateStr][habit.id];
+                    
+                    // Light theme styling for boxes
+                    const bgClass = isChecked 
+                        ? `${habit.color} border-transparent shadow-[0_4px_10px_rgba(0,0,0,0.15)]` 
+                        : 'bg-white border-slate-300 shadow-sm';
+                    const iconClass = isChecked ? 'opacity-100 scale-100' : 'opacity-0 scale-50 text-slate-300';
+
+                    html += `
+                        <td class="p-3 text-center">
+                            <div class="flex justify-center">
+                                <button onclick="toggleBox('${habit.id}', '${dateStr}', ${hIdx}, ${i})" 
+                                    id="btn-${hIdx}-${i}"
+                                    class="check-cell w-8 h-8 rounded-lg border-2 flex items-center justify-center cursor-pointer ${bgClass}">
+                                    <i class="fas fa-check text-white transition-all duration-300 ${iconClass}"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                }
+
+                // Row Progress
+                html += `
+                    <td class="p-3 align-middle">
+                        <div class="flex items-center gap-2">
+                            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                <div id="prog-bar-${hIdx}" class="h-full ${habit.color} progress-bar" style="width: 0%"></div>
+                            </div>
+                            <span id="prog-text-${hIdx}" class="text-xs font-bold text-slate-400 w-8 text-right">0%</span>
+                        </div>
+                    </td>
+                `;
+                
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderSparklines() {
+            dailySparklineContainer.innerHTML = '';
+            for (let i = 0; i < 7; i++) {
+                dailySparklineContainer.innerHTML += `<div id="spark-${i}" class="h-full bg-slate-200 progress-bar w-full" style="opacity: 0.5"></div>`;
+            }
+        }
+
+        function toggleBox(habitId, dateStr, hIdx, dIdx) {
+            if (!habitData[dateStr]) habitData[dateStr] = {};
+            habitData[dateStr][habitId] = !habitData[dateStr][habitId];
+            
+            localStorage.setItem('habitTrackerDataLight', JSON.stringify(habitData));
+            
+            const btn = document.getElementById(`btn-${hIdx}-${dIdx}`);
+            const icon = btn.querySelector('i');
+            const isChecked = habitData[dateStr][habitId];
+            const habitColor = habits[hIdx].color;
+            
+            if (isChecked) {
+                btn.className = `check-cell w-8 h-8 rounded-lg border-2 border-transparent flex items-center justify-center cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.15)] ${habitColor}`;
+                icon.className = 'fas fa-check text-white opacity-100 scale-100 transition-all duration-300';
+            } else {
+                btn.className = `check-cell w-8 h-8 rounded-lg border-2 border-slate-300 bg-white shadow-sm flex items-center justify-center cursor-pointer`;
+                icon.className = 'fas fa-check text-white opacity-0 scale-50 transition-all duration-300';
+            }
+
+            updateAllProgress(dateStr, dIdx);
+        }
+
+        function updateAllProgress(triggerDateStr = null, triggerDayIdx = -1) {
+            let totalCheckedThisWeek = 0;
+            const totalBoxesThisWeek = habits.length * 7;
+
+            // Row Progress
+            habits.forEach((habit, hIdx) => {
+                let rowChecked = 0;
+                for (let i = 0; i < 7; i++) {
+                    let d = new Date(currentWeekStart);
+                    d.setDate(d.getDate() + i);
+                    if (habitData[formatDate(d)]?.[habit.id]) rowChecked++;
+                }
+                
+                totalCheckedThisWeek += rowChecked;
+                const percent = Math.round((rowChecked / 7) * 100);
+                
+                document.getElementById(`prog-bar-${hIdx}`).style.width = `${percent}%`;
+                document.getElementById(`prog-text-${hIdx}`).innerText = `${percent}%`;
+                document.getElementById(`prog-text-${hIdx}`).className = `text-xs font-bold w-8 text-right transition-colors ${percent === 100 ? habit.iconColor : 'text-slate-400'}`;
+            });
+
+            // Column Progress
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(currentWeekStart);
+                d.setDate(d.getDate() + i);
+                
+                let dayChecked = 0;
+                habits.forEach(habit => {
+                    if (habitData[formatDate(d)]?.[habit.id]) dayChecked++;
+                });
+                
+                const dayPercent = Math.round((dayChecked / habits.length) * 100);
+                const dayLabel = document.getElementById(`day-${i}-prog`);
+                const spark = document.getElementById(`spark-${i}`);
+                
+                dayLabel.innerText = `${dayPercent}%`;
+                
+                if (dayPercent === 0) {
+                    dayLabel.className = 'p-3 text-center font-bold text-slate-300';
+                    spark.style.backgroundColor = '';
+                    spark.style.opacity = '0.5';
+                } else if (dayPercent < 100) {
+                    dayLabel.className = 'p-3 text-center font-bold text-blue-500';
+                    spark.style.backgroundColor = '#3b82f6'; // blue-500
+                    spark.style.opacity = '0.8';
+                    spark.style.height = `${dayPercent}%`;
+                    spark.style.marginTop = 'auto';
+                } else {
+                    dayLabel.className = 'p-3 text-center font-bold text-emerald-500 shadow-emerald-100 drop-shadow-md';
+                    spark.style.backgroundColor = '#10b981'; // emerald-500
+                    spark.style.opacity = '1';
+                    spark.style.height = '100%';
+                    
+                    if (triggerDayIdx === i) fireConfetti();
+                }
+            }
+
+            // Weekly Score
+            const overallPercent = Math.round((totalCheckedThisWeek / totalBoxesThisWeek) * 100);
+            const weeklyScoreEl = document.getElementById('weekly-score');
+            weeklyScoreEl.innerText = `${overallPercent}%`;
+            
+            if(overallPercent === 100 && totalCheckedThisWeek > 0) {
+                weeklyScoreEl.classList.add('animate-pulse');
+            } else {
+                weeklyScoreEl.classList.remove('animate-pulse');
+            }
+        }
+
+        // --- 5. OVERVIEW / HEATMAP LOGIC ---
+        function calculateMonthScore(year, month) {
+            let totalChecked = 0;
+            let totalDays = new Date(year, month + 1, 0).getDate();
+            let totalBoxes = totalDays * habits.length;
+
+            for(let d = 1; d <= totalDays; d++) {
+                let dateStr = formatDate(new Date(year, month, d));
+                if(habitData[dateStr]) {
+                    Object.values(habitData[dateStr]).forEach(val => {
+                        if(val) totalChecked++;
+                    });
+                }
+            }
+            return totalBoxes === 0 ? 0 : (totalChecked / totalBoxes);
+        }
+
+        function openOverview() {
+            let midWeek = new Date(currentWeekStart);
+            midWeek.setDate(midWeek.getDate() + 3);
+            overviewYear = midWeek.getFullYear();
+            
+            renderOverview();
+            const modal = document.getElementById('overview-modal');
+            const content = document.getElementById('modal-content');
+            
+            modal.classList.remove('hidden');
+            // Reset animation
+            content.classList.remove('modal-exit-active');
+            void content.offsetWidth; // trigger reflow
+            content.classList.add('modal-enter-active');
+        }
+
+        function closeOverview() {
+            const modal = document.getElementById('overview-modal');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.remove('modal-enter-active');
+            content.classList.add('modal-exit-active');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        function changeOverviewYear(offset) {
+            overviewYear += offset;
+            renderOverview();
+        }
+
+        function renderOverview() {
+            document.getElementById('overview-year').innerText = overviewYear;
+            const container = document.getElementById('overview-months');
+            container.innerHTML = '';
+            
+            for(let i = 0; i < 12; i++) {
+                const score = calculateMonthScore(overviewYear, i);
+                let bgClass = 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm';
+                let textClass = 'font-bold';
+                let subTextClass = 'text-slate-400';
+                
+                // Heatmap Gamification
+                if(score > 0) {
+                    if(score >= 0.8) {
+                        bgClass = 'bg-emerald-500 border-emerald-600 shadow-md shadow-emerald-200';
+                        textClass = 'font-bold text-white';
+                        subTextClass = 'text-emerald-100';
+                    }
+                    else if(score >= 0.4) {
+                        bgClass = 'bg-emerald-200 border-emerald-300';
+                        textClass = 'font-bold text-emerald-800';
+                        subTextClass = 'text-emerald-600';
+                    }
+                    else {
+                        bgClass = 'bg-emerald-50 border-emerald-200';
+                        textClass = 'font-bold text-emerald-700';
+                        subTextClass = 'text-emerald-500';
+                    }
+                }
+
+                // Highlight Current Month
+                const today = new Date();
+                if(today.getFullYear() === overviewYear && today.getMonth() === i && score === 0) {
+                    bgClass = 'bg-blue-50 border-blue-200';
+                    textClass = 'font-bold text-blue-700';
+                    subTextClass = 'text-blue-400';
+                }
+
+                container.innerHTML += `
+                    <button onclick="jumpToMonth(${overviewYear}, ${i})" class="aspect-square rounded-2xl flex flex-col items-center justify-center transition-all transform hover:-translate-y-1 ${bgClass}">
+                        <span class="${textClass} text-sm sm:text-base">${monthNamesShort[i]}</span>
+                        <span class="text-[10px] sm:text-xs mt-1 ${subTextClass}">${Math.round(score * 100)}%</span>
+                    </button>
+                `;
+            }
+        }
+
+        function jumpToMonth(year, month) {
+            let d = new Date(year, month, 1);
+            currentWeekStart = getMonday(d);
+            renderWeek();
+            closeOverview();
+        }
+
+        function fireConfetti() {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6']
+            });
+        }
+
+        function clearData() {
+            if(confirm('Xóa toàn bộ lịch sử thói quen? Hành động này không thể hoàn tác.')) {
+                localStorage.removeItem('habitTrackerDataLight');
+                habitData = {};
+                renderWeek();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
